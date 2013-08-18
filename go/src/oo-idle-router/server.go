@@ -14,6 +14,8 @@ import (
   "os/exec"
 )
 
+import _ "net/http/pprof"
+
 type Backend interface {
   Id() string
   Hosts() []string
@@ -45,6 +47,11 @@ func NewInactiveBackend(hosts []string, backendHost string, backendPort int) *In
       Director: func(req *http.Request) {
         req.URL.Scheme = "http"
         req.URL.Host = spec
+      },
+      Transport: &http.Transport{
+        Proxy: http.ProxyFromEnvironment, 
+        MaxIdleConnsPerHost: maxIdleConnsPerBackend,
+        ResponseHeaderTimeout: maxBackendResponseHeaderTimeout,
       },
     },
     make(chan chan bool),
@@ -123,7 +130,7 @@ func (b *InactiveBackend) Activate() {
     fmt.Println("  ", out)
   }
 
-  time.Sleep(3 * time.Second)
+  //time.Sleep(3 * time.Second)
 
   fmt.Println("  ", "Activated  "+b.Target)
   backends.Replace(b.Copy(&now))
@@ -144,7 +151,7 @@ func (b *InactiveBackend) Serve(res http.ResponseWriter, req *http.Request) {
 type Backends struct {
   mutex sync.Mutex
   gears map[string]Backend
-  activate chan *InactiveBackend  
+  activate chan *InactiveBackend
 }
 
 func (b *Backends) Activate(backend *InactiveBackend) {
@@ -187,43 +194,16 @@ func (e ActivationDisabled) Error() string {
     return string(e)
 }
 type Commands struct {
-  activate string
-}
-func (c *Commands) Init() {
-  c.activate = *flag.String("activate", "", "The command to use to activate an idled backend")
-  fmt.Println("Activate command =", c.activate)
 }
 func (c *Commands) Activate(backend Backend) (string, error) {
-  if len(c.activate) == 0 {
+  if len(commandActivate) == 0 {
     return "<activate disabled>", ActivationDisabled("Backends will not be activated")
   }
 
-  cmd := exec.Command(c.activate, backend.Id(), backend.Hosts()[0])
+  cmd := exec.Command(commandActivate, backend.Id(), backend.Hosts()[0])
   var out bytes.Buffer
   err := cmd.Run()
   return out.String(), err
-}
-
-var backends = Backends{gears: make(map[string]Backend)}
-var commands = Commands{}
-var activateTimeout = 15 * time.Second
-var startTime = time.Now()
-
-func main() {
-  fmt.Printf("GOMAXPROCS is %d\n", runtime.GOMAXPROCS(0))
-
-  commands.Init()
-
-  //var message = 
-  backends.Add("port22003.rhcloud.com", "localhost", 22003)
-  backends.Start(1)
-
-  http.HandleFunc("/", proxy)
-  var on = os.Getenv("HOST")+":"+os.Getenv("PORT")
-  fmt.Println("listening to "+on+"...")
-  if err := http.ListenAndServe(on, nil); err != nil {
-    panic(err)
-  }
 }
 
 func proxy(res http.ResponseWriter, req *http.Request) {
@@ -254,4 +234,42 @@ func errorWhileActivating(res http.ResponseWriter, req *http.Request) {
 func errorTimeout(res http.ResponseWriter, req *http.Request) {
   res.WriteHeader(503)
   res.Write([]byte("Timeout on backend"))
+}
+
+func init() {
+  flag.StringVar(&commandActivate, "activate", "", "The command to use to activate an idled backend")
+}
+
+var backends = Backends{gears: make(map[string]Backend)}
+var commands = Commands{}
+var activateTimeout = 15 * time.Second
+var startTime = time.Now()
+var commandActivate = ""
+var maxIdleConnsPerBackend = 2
+var maxBackendResponseHeaderTimeout = 30 * time.Second
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+
+func main() {
+  fmt.Printf("GOMAXPROCS is %d\n", runtime.GOMAXPROCS(0))
+  flag.Parse()
+  fmt.Println("Activate", commandActivate)
+/*
+  if *cpuprofile != "" {
+    f, err := os.Create(*cpuprofile)
+    if err != nil {
+        log.Fatal(err)
+    }
+    pprof.StartCPUProfile(f)
+    defer pprof.StopCPUProfile()
+  }
+*/
+  backends.Add("port22003.rhcloud.com", "localhost", 22003)
+  backends.Start(1)
+
+  http.HandleFunc("/", proxy)
+  var on = os.Getenv("HOST")+":"+os.Getenv("PORT")
+  fmt.Println("listening to "+on+"...")
+  if err := http.ListenAndServe(on, nil); err != nil {
+    panic(err)
+  }
 }

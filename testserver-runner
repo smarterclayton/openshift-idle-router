@@ -1,0 +1,2 @@
+#!/bin/sh
+./testserver -p 22004 &
