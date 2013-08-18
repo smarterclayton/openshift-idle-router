@@ -1,0 +1,27 @@
+#!/bin/sh
+killall 'testserver'
+killall 'ooidlerouter'
+
+set -e
+GOPATH=$(readlink -f ./go)
+go build testserver
+go build oo-idle-router
+
+HOST=127.0.0.1
+PORT=22001 ./testserver & pid_1=$!
+PORT=22002 ./testserver & pid_2=$!
+PORT=22003 ./testserver & pid_3=$!
+PORT=21999 ./oo-idle-router -activate "PORT=22004 ./testserver &" & pid_4=$!
+
+echo TRY: curl http://localhost:22000 -H "Host: port22001.rhcloud.com"
+echo TRY: curl http://localhost:22000 -H "Host: port22002.rhcloud.com"
+echo TRY: curl http://localhost:22000 -H "Host: port22003.rhcloud.com"
+
+trap ctrl_c INT
+function ctrl_c() {
+  echo ' stopping children'
+}
+
+../haproxy-1.5-dev19/haproxy -f haproxy.cfg
+
+kill $pid_1 $pid_2 $pid_3 $pid_4
