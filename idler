@@ -23,6 +23,6 @@ function ctrl_c() {
   echo ' stopping children'
 }
 
-../haproxy-1.5-dev19/haproxy -d -f haproxy.cfg
+../haproxy-1.5-dev19/haproxy -f haproxy.cfg
 
 kill $pid_1 $pid_2 $pid_3 $pid_4

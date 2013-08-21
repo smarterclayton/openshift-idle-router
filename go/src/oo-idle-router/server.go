@@ -245,7 +245,7 @@ var commands = Commands{}
 var activateTimeout = 15 * time.Second
 var startTime = time.Now()
 var commandActivate = ""
-var maxIdleConnsPerBackend = 2
+var maxIdleConnsPerBackend = 16
 var maxBackendResponseHeaderTimeout = 30 * time.Second
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
