@@ -149,7 +149,7 @@ func (b *InactiveBackend) Serve(res http.ResponseWriter, req *http.Request) {
 
 
 type Backends struct {
-  mutex sync.Mutex
+  mutex sync.RWMutex
   gears map[string]Backend
   activate chan *InactiveBackend
 }
@@ -171,20 +171,41 @@ func (b *Backends) Start(workers int) {
   }
 }
 
-func (b *Backends) Add(host string, backendHost string, backendPort int) {
+func (b *Backends) active() map[string]Backend {
+  b.mutex.RLock(); defer b.mutex.RUnlock()
+  return b.gears
+}
+
+func (b *Backends) copy() map[string]Backend {
+  active := b.active()
+  replace := make(map[string]Backend)
+  for key, value := range active {
+    replace[key] = value
+  }
+  return replace
+}
+
+func (b *Backends) swap(replace map[string]Backend) map[string]Backend {
   b.mutex.Lock(); defer b.mutex.Unlock()
+  b.gears = replace
+  return replace
+}
+
+func (b *Backends) Add(host string, backendHost string, backendPort int) {
+  replace := b.copy()
   var backend = NewInactiveBackend([]string{host}, backendHost, backendPort)
-  b.gears[host] = backend
+  replace[host] = backend
+  b.swap(replace)
 }
 func (b *Backends) Replace(backend Backend) {
-  b.mutex.Lock(); defer b.mutex.Unlock()
+  replace := b.copy()
   for _, host := range backend.Hosts() {
-    b.gears[host] = backend
+    replace[host] = backend
   }
+  b.swap(replace)
 }
 func (b *Backends) For(host string) (Backend, bool) {
-  b.mutex.Lock(); defer b.mutex.Unlock()
-  backend, ok := b.gears[host]
+  backend, ok := b.active()[host]
   return backend, ok
 }
 
