@@ -1,4 +1,30 @@
 #!/bin/sh
+cat <<DOC >/dev/null
+
+A script for demonstrating and perf testing a two tier routing architecture:
+
+  HAProxy (serving high traffic backends)
+  oo-idle-router in Go (serving backends that may be idled or low traffic)
+
+  HAProxy
+    -> high traffic backend 1
+    -> high traffic backend 2
+    -> high traffic backend 3
+    -> ...
+    -> high traffic backend N
+
+    -> fallthrough to oo-idle-router
+
+    oo-idle-router
+      keeps a map of hosts -> gears
+      able to invoke a command to activate a gear if it is idled
+      able to route HTTP traffic at reasonably high rates
+
+      -> proxy to idle backend 1
+      -> proxy to low-activity backend 2
+
+DOC
+
 killall 'testserver'
 killall 'oo-idle-router'
 
