@@ -38,7 +38,8 @@ HOST=127.0.0.1
 PORT=22001 ./testserver & pid_1=$!
 PORT=22002 ./testserver & pid_2=$!
 GOMAXPROCS=2 PORT=22003 ./testserver & pid_3=$!
-GOGCTRACE=1 GOMAXPROCS=2 PORT=21999 ./oo-idle-router -activate=$TESTSERVER_PATH-runner & pid_4=$!
+#GOGCTRACE=1 
+GOMAXPROCS=2 PORT=21999 ./oo-idle-router -activate=$TESTSERVER_PATH-runner & pid_4=$!
 
 echo TRY: curl http://localhost:22000 -H "Host: port22001.rhcloud.com"
 echo TRY: curl http://localhost:22000 -H "Host: port22002.rhcloud.com"
